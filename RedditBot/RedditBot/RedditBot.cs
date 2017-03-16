@@ -10,35 +10,35 @@ using System.Text.RegularExpressions;
 
 namespace RedditBot
 {
-    class RedditBot
+    class RedditBot : IDisposable
     {
-        static RedditBot()
+        private HttpClient client = new HttpClient();
+
+        public RedditBot()
         {
 
         }
 
-        public static RedditAccessToken Authorization (string username, string password)
+        public RedditAccessToken Authorization (string username, string password)
         {
 
-            using (var client = new HttpClient())
-            {
-                string clientId = "r11-_6UcVOcikg";
-                string clientSecret = "dJAaEzTDmNoxXU5j3_hk1ks9DQQ";
+                string clientId = "fUNGMb7NxqXHgQ";
+                string clientSecret = "o1LjBuXgTQUk-GaqBhfY-bcQCsY";
                 var authenticationArray = Encoding.ASCII.GetBytes($"{clientId}:{clientSecret}");
                 var encodedAuthenticationString = Convert.ToBase64String(authenticationArray);
                 client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", encodedAuthenticationString);
 
                 var clientVersion = "0.01";
-                var redditUsername = "PrettyNiceBotTest";
-                var redditPassword = "BotTest?";
-                client.DefaultRequestHeaders.Add("User-Agent", $"NiceBotTest /v{clientVersion} by {redditUsername}");
+                client.DefaultRequestHeaders.Add("User-Agent", $"TheSuperemeBotTest /v{clientVersion} by {username}");
 
                 var formData = new Dictionary<string, string>
                 {
                     { "grant_type", "password" },
-                    { "username", redditUsername },
-                    { "password", redditPassword }
+                    { "username", username },
+                    { "password", password }
                 };
+
+
                 var encodedFormData = new FormUrlEncodedContent(formData);
                 var authUrl = "https://www.reddit.com/api/v1/access_token";
                 var response = client.PostAsync(authUrl, encodedFormData).GetAwaiter().GetResult();
@@ -57,7 +57,12 @@ namespace RedditBot
                 responseData = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                 RedditAccessToken token = new RedditAccessToken(accessToken, JObject.Parse(responseData).SelectToken("token_type").ToString(), Convert.ToInt16(JObject.Parse(responseData).SelectToken("expires_in")));
                 return token;
-            }
+            
+        }
+
+        public void Dispose()
+        {
+            client.Dispose();
         }
 
         public string IDFromLink(string link)
@@ -86,12 +91,26 @@ namespace RedditBot
             }
         }
 
-        public bool UpvoteAsync(int direction, string link)
+        public void VoteAsync(int direction, string link)
         {
-            using (HttpClient client = new HttpClient())
+            var response = client.GetAsync("https://oauth.reddit.com/r/sandboxtest/hot").GetAwaiter().GetResult();
+            var responseData = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+
+            Console.WriteLine(responseData);
+            var id = IDFromLink(link);
+
+            var formdata = new Dictionary<string, string>()
             {
-                
-            }
+                {"api_type", "json" },
+                {"text", "gustav" },
+                {"thing_id", id }
+
+            };
+            var encodedFormData = new FormUrlEncodedContent(formdata);
+
+             response = client.PostAsync("https://oauth.reddit.com/api/comment", encodedFormData).GetAwaiter().GetResult();
+             responseData = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+            Console.WriteLine(responseData);
         }
     }
 }
