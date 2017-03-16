@@ -67,13 +67,14 @@ namespace RedditBot
 
         public string IDFromLink(string link)
         {
-            Regex reg = new Regex("comments\\/.*?\\/([a-zA-Z0-9]{4,})\\/");
+            Regex reg = new Regex("comments\\/.*?\\/.*?\\/([a-zA-Z0-9]{4,})\\/");
             Match match = reg.Match(link);
             
 
             if (match.Length > 0)
             {
-                return $"t1_{match.Groups[0].Value}";
+                var x = $"t1_{match.Groups[1]}";
+                return $"t1_{match.Groups[1]}";
             }
             else
             {
@@ -82,7 +83,8 @@ namespace RedditBot
 
                 if (match.Length > 0)
                 {
-                    return $"t3_{match.Groups[0].Value}";
+                    var x = $"t3_{match.Groups[1]}";
+                    return $"t3_{match.Groups[1]}";
                 }
                 else
                 {
@@ -93,24 +95,29 @@ namespace RedditBot
 
         public void VoteAsync(int direction, string link)
         {
-            var response = client.GetAsync("https://oauth.reddit.com/r/sandboxtest/hot").GetAwaiter().GetResult();
-            var responseData = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-
-            Console.WriteLine(responseData);
             var id = IDFromLink(link);
 
             var formdata = new Dictionary<string, string>()
             {
-                {"api_type", "json" },
-                {"text", "gustav" },
-                {"thing_id", id }
+                {"dir", direction.ToString() },
+                {"id", id },
+                {"rank", "2" }
 
             };
             var encodedFormData = new FormUrlEncodedContent(formdata);
 
-             response = client.PostAsync("https://oauth.reddit.com/api/comment", encodedFormData).GetAwaiter().GetResult();
-             responseData = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+            var response = client.PostAsync("https://oauth.reddit.com/api/vote", encodedFormData).GetAwaiter().GetResult();
+            var responseData = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
             Console.WriteLine(responseData);
+        }
+
+        public void GetListing(string subreddit)
+        {
+            var response = client.GetAsync(String.Format("https://oauth.reddit.com/r/{0}/hot", subreddit)).GetAwaiter().GetResult();
+            var responseData = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+            Console.WriteLine(responseData);
+            var posts = JObject.Parse(responseData).SelectTokens("$.data.children.data.url").ToString();
+            Console.WriteLine(posts);
         }
     }
 }
