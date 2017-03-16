@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Net.Http;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System.Text.RegularExpressions;
 
 namespace RedditBot
 {
@@ -16,7 +17,7 @@ namespace RedditBot
 
         }
 
-        public static RedditAccessToken (string username, string password)
+        public static RedditAccessToken Authorization (string username, string password)
         {
 
             using (var client = new HttpClient())
@@ -55,8 +56,42 @@ namespace RedditBot
                 
                 responseData = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                 RedditAccessToken token = new RedditAccessToken(accessToken, JObject.Parse(responseData).SelectToken("token_type").ToString(), Convert.ToInt16(JObject.Parse(responseData).SelectToken("expires_in")));
-                Console.ReadKey();
+                return token;
             }
-    }
+        }
+
+        public string IDFromLink(string link)
+        {
+            Regex reg = new Regex("comments\\/.*?\\/([a-zA-Z0-9]{4,})\\/");
+            Match match = reg.Match(link);
+            
+
+            if (match.Length > 0)
+            {
+                return $"t1_{match.Groups[0].Value}";
+            }
+            else
+            {
+                reg = new Regex("comments\\/([a-zA-Z0-9]{4,})\\/");
+                match = reg.Match(link);
+
+                if (match.Length > 0)
+                {
+                    return $"t3_{match.Groups[0].Value}";
+                }
+                else
+                {
+                    return null;
+                }
+            }
+        }
+
+        public bool UpvoteAsync(int direction, string link)
+        {
+            using (HttpClient client = new HttpClient())
+            {
+                
+            }
+        }
     }
 }
