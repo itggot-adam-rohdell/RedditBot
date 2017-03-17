@@ -10,13 +10,16 @@ namespace RedditBot
     {
         static void Main(string[] args)
         {
-            using (var hej = new RedditBot())
+            using (var bot = new RedditBot())
             {
-                hej.Authorization("TheSuperemeBot", "grillkorv123");
+                bot.Authorization("TheSuperemeBot", "grillkorv123");
 
-                //hej.VoteAsync(1, "https://www.reddit.com/r/sandboxtest/comments/5ziqr1/chuhbu/");
-                hej.GetListing("sandboxtest");
+                var targets = bot.SelectTargets(bot.FindTitleAndUrlInChildren(bot.GetListingAsJson("sandboxtest")), "test");
                 
+                foreach (string target in targets)
+                {
+                    bot.CommentAsync("this appears to be a test", target);
+                }
                 Console.ReadKey();
             }
         }

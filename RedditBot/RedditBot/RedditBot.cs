@@ -93,6 +93,8 @@ namespace RedditBot
             }
         }
 
+        public 
+
         public void VoteAsync(int direction, string link)
         {
             var id = IDFromLink(link);
@@ -108,48 +110,68 @@ namespace RedditBot
 
             var response = client.PostAsync("https://oauth.reddit.com/api/vote", encodedFormData).GetAwaiter().GetResult();
             var responseData = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-            Console.WriteLine(responseData);
-            GetListing("sandboxtest");
+            //Console.WriteLine(responseData);
+            //GetListing("sandboxtest");
         }
 
-        public void GetListing(string subreddit)
+        public void CommentAsync(string comment, string link)
+        {
+            var id = IDFromLink(link);
+
+            Dictionary<string, string> formdata = new Dictionary<string, string>()
+            {
+                {"api_type", "json" },
+                {"text", comment },
+                {"thing_id", id }
+            };
+            var encodedFormData = new FormUrlEncodedContent(formdata);
+
+            var response = client.PostAsync("https://oauth.reddit.com/api/comment", encodedFormData).GetAwaiter().GetResult();
+            var responseData = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+            var listings = FindTitleAndUrlInChildren(GetListingAsJson("sandboxtest"));
+            var targets = SelectTargets(listings, includeInTitle);
+        }
+
+        public JObject GetListingAsJson(string subreddit)
         {
             var response = client.GetAsync(String.Format("https://oauth.reddit.com/r/{0}/hot", subreddit)).GetAwaiter().GetResult();
             var responseData = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-            System.IO.File.WriteAllText(@"./File.txt", responseData);
-            var posts = JObject.Parse(responseData);
-
-            var kek = FindTitleAndUrlInChildren(posts);
-            foreach (string a in kek.Keys)
-            {
-                Console.WriteLine($"{a} {kek[a]}");
-                Console.WriteLine(kek.Count);
-            }
-            
-            
+            return JObject.Parse(responseData);
         }
 
         public Dictionary<string, string> FindTitleAndUrlInChildren(JObject json)
         {
             var children = json.SelectToken("data.children").Children();
-            Dictionary<string, string> targets = new Dictionary<string, string>();
+            Dictionary<string, string> listings = new Dictionary<string, string>();
             var i = 1;
 
             foreach (JToken token in children)
-            {
-                
+            {               
                 var title = token.SelectToken("data.title").ToObject<string>();
-                if (targets.ContainsKey(title))
+                if (listings.ContainsKey(title))
                 {
-                    targets.Add($"{title} {i}" , token.SelectToken("data.url").ToObject<string>());
+                    listings.Add($"{title} {i}" , token.SelectToken("data.url").ToObject<string>());
                     i += 1;
                 }
                 else
                 {
-                    targets.Add(title, token.SelectToken("data.url").ToObject<string>());
+                    listings.Add(title, token.SelectToken("data.url").ToObject<string>());
+                }
+            }
+            return listings;
+        } 
+
+        public List<string> SelectTargets(Dictionary<string, string> dic, string partOfTitle)
+        {
+            List<string> targets = new List<string>();
+            foreach (KeyValuePair<string, string> unit in dic)
+            {
+                if (unit.Key.Contains(partOfTitle))
+                {
+                    targets.Add(unit.Value);
                 }
             }
             return targets;
-        } 
+        }
     }
 }
