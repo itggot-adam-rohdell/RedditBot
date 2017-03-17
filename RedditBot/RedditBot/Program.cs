@@ -16,6 +16,7 @@ namespace RedditBot
 
                 //hej.VoteAsync(1, "https://www.reddit.com/r/sandboxtest/comments/5ziqr1/chuhbu/");
                 hej.GetListing("sandboxtest");
+                
                 Console.ReadKey();
             }
         }

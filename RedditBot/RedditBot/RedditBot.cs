@@ -109,15 +109,47 @@ namespace RedditBot
             var response = client.PostAsync("https://oauth.reddit.com/api/vote", encodedFormData).GetAwaiter().GetResult();
             var responseData = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
             Console.WriteLine(responseData);
+            GetListing("sandboxtest");
         }
 
         public void GetListing(string subreddit)
         {
             var response = client.GetAsync(String.Format("https://oauth.reddit.com/r/{0}/hot", subreddit)).GetAwaiter().GetResult();
             var responseData = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-            Console.WriteLine(responseData);
-            var posts = JObject.Parse(responseData).SelectTokens("$.data.children.data.url").ToString();
-            Console.WriteLine(posts);
+            System.IO.File.WriteAllText(@"./File.txt", responseData);
+            var posts = JObject.Parse(responseData);
+
+            var kek = FindTitleAndUrlInChildren(posts);
+            foreach (string a in kek.Keys)
+            {
+                Console.WriteLine($"{a} {kek[a]}");
+                Console.WriteLine(kek.Count);
+            }
+            
+            
         }
+
+        public Dictionary<string, string> FindTitleAndUrlInChildren(JObject json)
+        {
+            var children = json.SelectToken("data.children").Children();
+            Dictionary<string, string> targets = new Dictionary<string, string>();
+            var i = 1;
+
+            foreach (JToken token in children)
+            {
+                
+                var title = token.SelectToken("data.title").ToObject<string>();
+                if (targets.ContainsKey(title))
+                {
+                    targets.Add($"{title} {i}" , token.SelectToken("data.url").ToObject<string>());
+                    i += 1;
+                }
+                else
+                {
+                    targets.Add(title, token.SelectToken("data.url").ToObject<string>());
+                }
+            }
+            return targets;
+        } 
     }
 }
