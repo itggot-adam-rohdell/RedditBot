@@ -10,15 +10,16 @@ namespace RedditBot
     {
         static void Main(string[] args)
         {
-            using (var bot = new RedditBot())
+            TokenBucket tb = new TokenBucket(30, 60);
+            using (var bot = new RedditBot(tb))
             {
-                bot.Authorization("TheSuperemeBot", "grillkorv123");
+                bot.LogIn("TheSuperemeBot", "grillkorv123");
 
                 var targets = bot.SelectTargets(bot.FindTitleAndUrlInChildren(bot.GetListingAsJson("sandboxtest")), "test");
                 
                 foreach (string target in targets)
                 {
-                    bot.CommentAsync("this appears to be a test", target);
+                    bot.SaveThreadAsync("tests", target);
                 }
                 Console.ReadKey();
             }
