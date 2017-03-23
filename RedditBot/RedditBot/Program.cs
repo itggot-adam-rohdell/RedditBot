@@ -11,7 +11,7 @@ namespace RedditBot
         static void Main(string[] args)
         {
             TokenBucket tb = new TokenBucket(30, 60);
-            using (var bot = new RedditBot(tb))
+            using (var bot = new RedditBot(tb, mySuperStrategy))
             {
                 bot.LogIn("TheSuperemeBot", "grillkorv123");
 
