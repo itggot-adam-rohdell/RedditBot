@@ -184,11 +184,12 @@ namespace RedditBot
 
 
 
-    // Sends a GET request to specified subreddit and returns the top 100 hot posts as a JObject
-    public JObject GetListingAsJson(string subreddit)
+        
+        // Gör detta till en metod som returnerar en lista av RedditPosts 
+        public JObject GetListingAsJson(string subreddit)
         {
             // Save the respone from the GET as a string
-            _response = _client.GetAsync(String.Format("https://oauth.reddit.com/r/{0}/hot", subreddit)).GetAwaiter().GetResult();
+            _response = GetAsync(String.Format("https://oauth.reddit.com/r/{0}/hot", subreddit));
             _responseData = _response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
 
             // Return the response parsed as a JObject
@@ -246,3 +247,30 @@ namespace RedditBot
         }
     }
 }
+
+
+
+
+
+
+
+// 1. Decide on 2 additional actions that the RedditBot should be able to perform
+// 2. Clean up the current actions methods to implement the new PostAsync and GetAsync methods
+// 3. Write the methods for the 2 remaining actions using the PostAsync and GetAsync methods
+// 4. Implement the RedditAccessToken check for all requests in the PostAsync and GetAsync methods
+// 5. Write the BotStrategy class for saving a post
+// 6. Write the RBStrategy interface for the BotStratergies
+// 7. Write a functional and well-written documentation for your API
+// 8. 
+// 9. ???
+// 10. Profit.
+
+// Hey! Ensure the code is well-documented and it is clear for the User how to use your API
+
+// Extras: Make sure the return value is an object of high relevancy, hence writing new classes for return objects
+//         with appropriate methods and variables accompaning them.
+
+// Extras: 
+
+
+// 1. fetch listings, fetch post, fetch comment, Comment

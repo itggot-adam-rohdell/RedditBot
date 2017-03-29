@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 
 namespace RedditBot
 {
-    class BotStratergy
+    class BotStrategy
     {
-        public BotStratergy()
+        public BotStrategy()
         {
             
         }
