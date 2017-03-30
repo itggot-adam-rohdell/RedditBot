@@ -155,25 +155,30 @@ namespace RedditBot
             }
         }
 
-        public async Task<JObject> PostAsync(string url, Dictionary<string, string> formData)
+        //public async Task<JObject> PostAsync(string url, Dictionary<string, string> formData)
+        //{
+        //    var encodedFormData = new FormUrlEncodedContent(formData);
+        //    _response = await _client.PostAsync(url, encodedFormData);
+        //    _responseData = _response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+        //    return JObject.Parse(_responseData);
+        //}
+
+        //public async Task<JObject> GetAsync(string url)
+        //{
+        //    // Save the respone from the GET as a string
+        //    _response = await _client.GetAsync(url);
+        //    _responseData = _response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+
+        //    // Return the response parsed as a JObject
+        //    return JObject.Parse(_responseData);
+        //}
+
+        private JObject ParseResponseMessageAsJson(HttpResponseMessage msg)
         {
-            var encodedFormData = new FormUrlEncodedContent(formData);
-            _response = await _client.PostAsync(url, encodedFormData);
-            _responseData = _response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-            return JObject.Parse(_responseData);
+            var data = msg.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+
+            return JObject.Parse(data);
         }
-
-        public async Task<JObject> GetAsync(string url)
-        {
-            // Save the respone from the GET as a string
-            _response = await _client.GetAsync(url);
-            _responseData = _response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-
-            // Return the response parsed as a JObject
-            return JObject.Parse(_responseData);
-        }
-
-
 
 
 
@@ -186,14 +191,17 @@ namespace RedditBot
 
         
         // Gör detta till en metod som returnerar en lista av RedditPosts 
-        public JObject GetListingAsJson(string subreddit)
+        public List<RedditPost> GetListingAsPosts(string subreddit)
         {
-            // Save the respone from the GET as a string
-            _response = GetAsync(String.Format("https://oauth.reddit.com/r/{0}/hot", subreddit));
-            _responseData = _response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+            var listings = ParseResponseMessageAsJson(_client.GetAsync(String.Format("https://oauth.reddit.com/r/{0}/hot", subreddit)).GetAwaiter().GetResult());
+            var children = listings.SelectToken("data.children").Children();
+            List<RedditPost> posts = new List<RedditPost>();
 
-            // Return the response parsed as a JObject
-            return JObject.Parse(_responseData);
+            foreach (JToken post in children)
+            {
+                var newPost = new RedditPost();
+            }
+
         }
 
         // Returns the Title and Url of each post as a Dictionary
@@ -273,4 +281,4 @@ namespace RedditBot
 // Extras: 
 
 
-// 1. fetch listings, fetch post, fetch comment, Comment
+// 1. fetch listings, fetch post, fetch comment, Comment, save post
