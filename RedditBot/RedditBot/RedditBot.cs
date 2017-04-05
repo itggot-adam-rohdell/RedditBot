@@ -16,6 +16,9 @@ namespace RedditBot
         private TokenBucket _bucket;
         private HttpResponseMessage _response;
         private string _responseData;
+        private static Random rand = new Random();
+        private RedditAccessToken RAtoken;
+        private string _username, _password;
 
         public RedditBot(TokenBucket tb)
         {
@@ -25,6 +28,9 @@ namespace RedditBot
         // Logs the bot into reddit, takes the login credentials as arguments
         public void LogIn(string username, string password)
         {
+            _username = username;
+            _password = password;
+
             // The ID and Secret that we get from Reddit when creating a bot
             string clientId = "fUNGMb7NxqXHgQ", clientSecret = "o1LjBuXgTQUk-GaqBhfY-bcQCsY";
 
@@ -83,12 +89,12 @@ namespace RedditBot
 
                 // Sets the DefaultRequestHeaders
                 _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("bearer", accessToken);
-                RedditAccessToken token = new RedditAccessToken(accessToken, JObject.Parse(_responseData).SelectToken("token_type").ToString(), Convert.ToInt16(JObject.Parse(_responseData).SelectToken("expires_in")));
+                RAtoken = new RedditAccessToken(accessToken, JObject.Parse(_responseData).SelectToken("token_type").ToString(), Convert.ToInt16(JObject.Parse(_responseData).SelectToken("expires_in")));
         }
 
 
         // Uses Regex to extract the post or comment ID from a Url
-        public string IDFromLink(string url)
+        public string FullnameFromLink(string url)
         {
             // Regular expression for matching comment ID from a Url
             Regex reg = new Regex("comments\\/.*?\\/.*?\\/([a-zA-Z0-9]{4,})\\/");
@@ -125,7 +131,7 @@ namespace RedditBot
         public async void SaveThreadAsync(string category, string url)
         {
             // Gets the fullname of the post
-            var id = IDFromLink(url);
+            var id = FullnameFromLink(url);
 
             // The formdata reddit asks for when posting to api/save
             Dictionary<string, string> formdata = new Dictionary<string, string>()
@@ -133,45 +139,59 @@ namespace RedditBot
                 {"category", category },
                 {"id", id }          
             };
+           
+            // Post the formdata
+            var response = await PostAsync("https://oauth.reddit.com/api/save", formdata);
 
-            // Encode the formdata to ASCII
-            var encodedFormData = new FormUrlEncodedContent(formdata);
+            Console.WriteLine(response.ToString());
 
-            // Call on the token bucket to make sure we are not exceeding the request limit
-            if (_bucket.requestIsAllowed(DateTime.Now))
+            
+        }
+
+        public async Task<JObject> PostAsync(string url, Dictionary<string, string> formData)
+        {
+            if (RAtoken.TimeLeftToRenew() > 20)
             {
-                // Post the formdata
-                _response = await _client.PostAsync("https://oauth.reddit.com/api/save", encodedFormData);
+                if (_bucket.requestIsAllowed(DateTime.Now))
+                {
+                    var encodedFormData = new FormUrlEncodedContent(formData);
+                    _response = await _client.PostAsync(url, encodedFormData);
+                    _responseData = _response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
 
-                // Print out the Statuscode to ensure we are succesfully posting
-                Console.WriteLine(_response.StatusCode);
+                    // Print out the Statuscode to ensure that we are succesfully posting
+                    Console.WriteLine(_response.StatusCode);
+
+                    return JObject.Parse(_responseData);
+                }
+                else
+                {
+                    System.Threading.Thread.Sleep(_bucket.TimeUntilRefresh() * rand.Next(1000, 1100));
+                    return await PostAsync(url, formData);
+                }
             }
             else
             {
-                // If the bucket is empty, sleep the current thread untill it is refreshed
-                // and then recall the method with the same arguments 
-                System.Threading.Thread.Sleep(_bucket.TimeUntilRefresh() * 1000);
-                SaveThreadAsync(category, url);
+                
             }
         }
 
-        //public async Task<JObject> PostAsync(string url, Dictionary<string, string> formData)
-        //{
-        //    var encodedFormData = new FormUrlEncodedContent(formData);
-        //    _response = await _client.PostAsync(url, encodedFormData);
-        //    _responseData = _response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-        //    return JObject.Parse(_responseData);
-        //}
+        public async Task<JObject> GetAsync(string url)
+        {
+            if (_bucket.requestIsAllowed(DateTime.Now))
+            {
+                // Save the respone from the GET as a string
+                _response = await _client.GetAsync(url);
+                _responseData = _response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
 
-        //public async Task<JObject> GetAsync(string url)
-        //{
-        //    // Save the respone from the GET as a string
-        //    _response = await _client.GetAsync(url);
-        //    _responseData = _response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-
-        //    // Return the response parsed as a JObject
-        //    return JObject.Parse(_responseData);
-        //}
+                // Return the response parsed as a JObject
+                return JObject.Parse(_responseData);
+            }
+            else
+            {
+                System.Threading.Thread.Sleep(_bucket.TimeUntilRefresh() * rand.Next(1000, 1100));
+                return await GetAsync(url);
+            }
+        }
 
         private JObject ParseResponseMessageAsJson(HttpResponseMessage msg)
         {
@@ -190,7 +210,7 @@ namespace RedditBot
 
 
         
-        // Gör detta till en metod som returnerar en lista av RedditPosts 
+        
         public List<RedditPost> GetListingAsPosts(string subreddit)
         {
             var listings = ParseResponseMessageAsJson(_client.GetAsync(String.Format("https://oauth.reddit.com/r/{0}/hot", subreddit)).GetAwaiter().GetResult());
@@ -199,8 +219,10 @@ namespace RedditBot
 
             foreach (JToken post in children)
             {
-                var newPost = new RedditPost();
+                var newPost = new RedditPost(FullnameFromLink(post.SelectToken("data.url").ToObject<string>()));
+                posts.Add(newPost);
             }
+            return posts;
 
         }
 
@@ -262,9 +284,9 @@ namespace RedditBot
 
 
 
-// 1. Decide on 2 additional actions that the RedditBot should be able to perform
-// 2. Clean up the current actions methods to implement the new PostAsync and GetAsync methods
-// 3. Write the methods for the 2 remaining actions using the PostAsync and GetAsync methods
+
+
+
 // 4. Implement the RedditAccessToken check for all requests in the PostAsync and GetAsync methods
 // 5. Write the BotStrategy class for saving a post
 // 6. Write the RBStrategy interface for the BotStratergies
