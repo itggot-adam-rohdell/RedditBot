@@ -41,6 +41,11 @@ namespace RedditBot
             }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="dt"></param>
+        /// <returns></returns>
         private bool TokenRefill(DateTime dt)
         {
             if ((dt - _timeAtLastRefresh).TotalSeconds >= _refreshRateInSeconds)

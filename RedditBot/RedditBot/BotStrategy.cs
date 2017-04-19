@@ -15,7 +15,7 @@ namespace RedditBot
 
         public void Run(RedditBot bot)
         {
-            
+            bot.
         }
 
 
