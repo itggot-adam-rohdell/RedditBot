@@ -10,20 +10,22 @@ using System.Text.RegularExpressions;
 
 namespace RedditBot
 {
-    class RedditBot : IDisposable
+     class RedditBot : IDisposable
     {
         private HttpClient _client = new HttpClient();
         private TokenBucket _bucket;
-        private HttpResponseMessage _response;
+        private HttpResponseMessage _response = null;
         private string _responseData;
         private static Random rand = new Random();
         private RedditAccessToken RAtoken;
         private string _username, _password;
-        private Dictionary<string, string> formData;
+        private Dictionary<string, string> logInFormData;
+        private BotStratergy strat;
 
-        public RedditBot(TokenBucket tb)
+        public RedditBot(TokenBucket tb, BotStratergy stratergy)
         {
             _bucket = tb;
+            strat = stratergy;
         }
 
         // Logs the bot into reddit, takes the login credentials as arguments
@@ -31,6 +33,7 @@ namespace RedditBot
         {
             _username = username;
             _password = password;
+           
 
             // The ID and Secret that we get from Reddit when creating a bot
             string clientId = "fUNGMb7NxqXHgQ", clientSecret = "o1LjBuXgTQUk-GaqBhfY-bcQCsY";
@@ -48,39 +51,42 @@ namespace RedditBot
             _client.DefaultRequestHeaders.Add("User-Agent", $"TheSuperemeBotTest /v{clientVersion} by {username}");
 
             // The form data that we are posting
-            formData = new Dictionary<string, string>
+            logInFormData = new Dictionary<string, string>
                 {
                     { "grant_type", "password" },
                     { "username", username },
                     { "password", password }
                 };
-            Authorization(formData);  
+           
+
+            Authorization(logInFormData);  
         }
         
 
         // Collect the access_token and set the default request headers
-        private void Authorization(Dictionary<string,string> formData)
-        {  
+        private void Authorization(Dictionary<string,string> content)
+        {
+            var encodedContent = new FormUrlEncodedContent(content);
+
             // Api-url for login
             var authUrl = "https://www.reddit.com/api/v1/access_token";
 
             // Post the form data and save the HttpResponeMessage
-            _response = PostAsync(authUrl, formData).GetAwaiter().GetResult();
+            _response = _client.PostAsync(authUrl, encodedContent).GetAwaiter().GetResult();
 
             // Response Code
-            Console.WriteLine(_response.StatusCode);
-
+             Console.WriteLine(_response.StatusCode);
+            
             // Actual Token
+           
             _responseData = _response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
             var accessToken = JObject.Parse(_responseData).SelectToken("access_token").ToString();
-
-
             // Sets the DefaultRequestHeaders
             _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("bearer", accessToken);
             RAtoken = new RedditAccessToken(accessToken, JObject.Parse(_responseData).SelectToken("token_type").ToString(), Convert.ToInt16(JObject.Parse(_responseData).SelectToken("expires_in")));
+            
         }
      
-
 
         // Uses Regex to extract the post or comment ID from a Url
         private string FullnameFromLink(string url)
@@ -117,16 +123,13 @@ namespace RedditBot
 
 
         // Posts the formdata to api/save, saves the post to your reddit account
-        public async void SaveThreadAsync(string category, string url)
-        {
-            // Gets the fullname of the post
-            var id = FullnameFromLink(url);
-
+        public async void SaveThreadAsync(string category, RedditPost post)
+        {          
             // The formdata reddit asks for when posting to api/save
             Dictionary<string, string> formdata = new Dictionary<string, string>()
             {
                 {"category", category },
-                {"id", id }          
+                {"id", post.fullname }          
             };
            
             // Post the formdata
@@ -134,6 +137,7 @@ namespace RedditBot
 
             Console.WriteLine(response.ToString()); 
         }
+
 
         private async Task<HttpResponseMessage> PostAsync(string url, Dictionary<string, string> formData)
         {
@@ -157,11 +161,12 @@ namespace RedditBot
             }
             else
             {
-                Authorization(formData);
+                Authorization(logInFormData);
                 System.Threading.Thread.Sleep(5000);
                 return await PostAsync(url, formData);
             }
         }
+
 
         private async Task<HttpResponseMessage> GetAsync(string url)
         {
@@ -184,49 +189,71 @@ namespace RedditBot
             }
             else
             {
-                Authorization(formData);
+                Authorization(logInFormData);
                 System.Threading.Thread.Sleep(2000);
                 return await GetAsync(url);
             }
         }
 
-        private JObject ParseResponseMessageAsJson(HttpResponseMessage msg)
-        {
-            var data = msg.Content.ReadAsStringAsync().GetAwaiter().GetResult();
 
-            return JObject.Parse(data);
+        private JToken ParseResponseMessageAsJson(Task<HttpResponseMessage> msg)
+        {
+            var awaitedMsg = msg.GetAwaiter().GetResult();
+            var data = awaitedMsg.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+            return JToken.Parse(data);        
         }
    
+
         public List<RedditPost> FetchListing(string subreddit)
         {
-            var listings = ParseResponseMessageAsJson(GetAsync(String.Format("https://oauth.reddit.com/r/{0}/hot", subreddit)).GetAwaiter().GetResult());
-            var children = listings.SelectToken("data.children").Children();
+           
+            var listings = ParseResponseMessageAsJson(GetAsync(String.Format("https://oauth.reddit.com/r/{0}/hot/", subreddit)));
+            var children = listings.SelectToken("data.children").Value<JArray>();
             List<RedditPost> posts = new List<RedditPost>();
-            List<RedditComment> comments = new List<RedditComment>();
 
             foreach (JToken post in children)
             {
-                var newPost = new RedditPost(FullnameFromLink(post.SelectToken("data.url").ToObject<string>()));
-                posts.Add(newPost);
+                var url = $"https://oauth.reddit.com{post.SelectToken("data.permalink").ToObject<string>()}";
+                posts.Add(FetchPost(url));
+                Console.WriteLine(posts.Count);  
             }
             return posts;
-
         }
+
 
         public RedditPost FetchPost(string postUrl)
         {
-            var response = ParseResponseMessageAsJson(GetAsync(postUrl).GetAwaiter().GetResult());
+            var response = ParseResponseMessageAsJson(GetAsync(postUrl));
             var post = response[0].SelectToken("data.children").Value<JArray>();
             var repliesToPost = response[1].SelectToken("data.children").Value<JArray>();
             var comments = new List<RedditComment>();
 
             foreach (JToken comment in repliesToPost)
             {
-                comments.Add(new RedditComment(comment.SelectToken("data.link_id").Value<string>(), comment.SelectToken("data.body").Value<string>(), comment.SelectToken("data.score").ToObject<Int32>(), comment.SelectToken("data.replies").Value<JArray>()));
+              // fix this shit
+
+                var url = $"https://oauth.reddit.com/{comment.SelectToken("data.subreddit_name_prefixed").ToObject<string>()}/comments/{post.SelectToken("data.id").ToObject<string>()}/{post.SelectToken("data.permalink").ToObject<string>().Substring(31)}/{comment.SelectToken("data.id").ToObject<string>()}/";
+                FetchComment(url);
+            }
+            return new RedditPost(post.SelectToken("data.title").ToObject<string>(), FullnameFromLink(postUrl), comments);
+        }
+        
+
+        public RedditComment FetchComment(string commentUrl)
+        {
+            var response = ParseResponseMessageAsJson(GetAsync(commentUrl));
+            var comment = response[1].SelectToken("data.children").Value<JArray>();
+            var repliesToComment = comment.SelectToken("data.replies").SelectToken("data.children").Value<JArray>();
+            var replies = new JArray();
+
+            foreach (JToken reply in repliesToComment)
+            {
+                replies.Add(reply);
             }
 
-            return new RedditPost(FullnameFromLink(postUrl), comments);
+            return new RedditComment(comment.SelectToken("data.name").ToObject<string>(), comment.SelectToken("data.body").ToObject<string>(), comment.SelectToken("data.score").ToObject<Int32>(), replies);
         }
+
 
         // Returns the Title and Url of each post as a Dictionary
         private Dictionary<string, string> FindTitleAndUrlInChildren(JObject json)
@@ -257,21 +284,7 @@ namespace RedditBot
             return listings;
         } 
 
-        //public List<string> SelectTargets(Dictionary<string, string> dic, string partOfTitle)
-        //{
-        //    List<string> targets = new List<string>();
-        //    foreach (KeyValuePair<string, string> unit in dic)
-        //    {
-        //        if (unit.Key.ToLower().Contains(partOfTitle))
-        //        {
-        //            targets.Add(unit.Value);
-        //        }
-        //    }
-        //    Console.WriteLine(targets.Count);
-        //    return targets;
-        //}
 
-        // Function to allow the extension of 'IDisposable'
         public void Dispose()
         {
             // Disposes the client as we dispose the RedditBot
@@ -289,8 +302,6 @@ namespace RedditBot
 
 
 
-// 5. Write the BotStrategy class for saving a post
-// 6. Write the RBStrategy interface for the BotStratergies
 // 7. Write a functional and well-written documentation for your API
 // 8. 
 // 9. ???
@@ -304,4 +315,4 @@ namespace RedditBot
 // Extras: 
 
 
-// 1. fetch listings, fetch post, fetch comment, Comment, save post
+// 1. fetch listings, fetch post, fetch comment, save post

@@ -10,10 +10,13 @@ namespace RedditBot
     {
         public List<RedditComment> comments { get; private set; }
         public string fullname { get; private set; }
+        public string title { get; private set; }
 
-        public RedditPost(string name)
+        public RedditPost(string ttl, string name, List<RedditComment> cmts)
         {
             fullname = name;
+            comments = cmts;
+            title = ttl;
         }
     }
 }

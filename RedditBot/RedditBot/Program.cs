@@ -10,17 +10,11 @@ namespace RedditBot
     {
         static void Main(string[] args)
         {
+            var elegigle = new BotStratergy();
             TokenBucket tb = new TokenBucket(30, 60);
-            using (var bot = new RedditBot(tb, mySuperStrategy))
+            using (var bot = new RedditBot(tb, elegigle))
             {
-                bot.LogIn("TheSuperemeBot", "grillkorv123");
-
-                var targets = bot.SelectTargets(bot.FindTitleAndUrlInChildren(bot.GetListingAsJson("sandboxtest")), "test");
-                
-                foreach (string target in targets)
-                {
-                    bot.SaveThreadAsync("tests", target);
-                }
+                elegigle.Run(bot);
                 Console.ReadKey();
             }
         }

@@ -48,7 +48,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="BotStrategy.cs" />
+    <Compile Include="BotStratergy.cs" />
+    <Compile Include="RBStratergy.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RedditAccessToken.cs" />
